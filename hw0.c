@@ -2,46 +2,83 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define MAX_LEVEL 4
+
 struct Node {
     char character;
     int count;
-    struct Node *next;
+    struct Node *next[MAX_LEVEL];
 };
 
-struct Node* createNode(char character) {
+int randomLevel() {
+    int level = 0;
+    while ((rand() % 2 == 0) && (level < MAX_LEVEL - 1)) {
+        level++;
+    }
+    return level;
+}
+
+struct Node* createNode(char character, int level) {
     struct Node *node = (struct Node*)malloc(sizeof(struct Node));
     node->character = character;
     node->count = 1;
-    node->next = NULL;
+    for (int i = 0; i <= level; i++) {
+        node->next[i] = NULL;
+    }
     return node;
 }
 
 struct Node* findLetter(struct Node *head, char character) {
     struct Node *current = head;
-    while (current != NULL) {
-        if (current->character == character) {
-            return current;
+    for (int i = MAX_LEVEL - 1; i >= 0; i--) {
+        while (current->next[i] != NULL && current->next[i]->character < character) {
+            current = current->next[i];
         }
-        current = current->next;
+    }
+    current = current->next[0];
+    if (current != NULL && current->character == character) {
+        return current;
     }
     return NULL;
 }
 
-void appendNode(struct Node *head, struct Node *newNode) {
+struct Node* insertLetter(struct Node *head, char character) {
+    struct Node *update[MAX_LEVEL];
     struct Node *current = head;
-    while (current->next != NULL) {
-        current = current->next;
+    
+    for (int i = MAX_LEVEL - 1; i >= 0; i--) {
+        while (current->next[i] != NULL && current->next[i]->character < character) {
+            current = current->next[i];
+        }
+        update[i] = current;
     }
-    current->next = newNode;
+    
+    current = current->next[0];
+    
+    if (current != NULL && current->character == character) {
+        current->count++;
+        return current;
+    }
+    
+    int newLevel = randomLevel();
+    struct Node *newNode = createNode(character, newLevel);
+    
+    for (int i = 0; i <= newLevel; i++) {
+        newNode->next[i] = update[i]->next[i];
+        update[i]->next[i] = newNode;
+    }
+    
+    return newNode;
 }
 
 void freeList(struct Node *head) {
-    struct Node *current = head;
+    struct Node *current = head->next[0];
     while (current != NULL) {
         struct Node *temp = current;
-        current = current->next;
+        current = current->next[0];
         free(temp);
     }
+    free(head);
 }
 
 int main() {
@@ -51,33 +88,22 @@ int main() {
         return 1;
     }
 
-    struct Node *head = NULL;
+    struct Node *head = createNode('\0', MAX_LEVEL - 1);
     int ch;
 
     while ((ch = fgetc(file)) != EOF) {
         if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r') {
             char character = (char)ch;
-
-            if (head == NULL) {
-                head = createNode(character);
-            } else {
-                struct Node *found = findLetter(head, character);
-                if (found != NULL) {
-                    found->count++;
-                } else {
-                    struct Node *newNode = createNode(character);
-                    appendNode(head, newNode);
-                }
-            }
+            insertLetter(head, character);
         }
     }
 
     fclose(file);
 
-    struct Node *current = head;
+    struct Node *current = head->next[0];
     while (current != NULL) {
         printf("%c: %d\n", current->character, current->count);
-        current = current->next;
+        current = current->next[0];
     }
 
     freeList(head);
