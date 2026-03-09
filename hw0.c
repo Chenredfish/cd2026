@@ -47,7 +47,7 @@ void freeList(struct Node *head) {
 int main() {
     FILE *file = fopen("hw0.c", "r");
     if (file == NULL) {
-        printf("無法開啟檔案\n");
+        printf("Cannot open file\n");
         return 1;
     }
 
