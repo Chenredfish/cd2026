@@ -11,53 +11,76 @@
  *   E  -> num
  *   E  -> ( S )
  *
- * Output rule (depth d, 2 spaces per level):
- *   parse_S(d)  prints "S -> E S'" at d, calls parse_E(d+1), parse_Sp(d)
- *   parse_Sp(d) prints "S' -> + S" / "S' -> e"  at d
- *   parse_E(d)  prints the number / "E -> ( S )" at d
+ * Scanner is based on HW#1's scanner structure.
+ * Only #include <stdio.h> and <string.h> are used.
  */
 
-/* ── Token types ───────────────────────────────────────────────── */
-#define TOK_NUM    0
-#define TOK_PLUS   1
-#define TOK_LPAREN 2
-#define TOK_RPAREN 3
-#define TOK_EOF    4
+/* ── Token types (same naming style as HW#1) ───────────────────── */
+typedef enum {
+    LITERAL_TOKEN,      /* integer number          */
+    PLUS_TOKEN,         /* +                       */
+    LEFTPAREN_TOKEN,    /* (                       */
+    RIGHTPAREN_TOKEN,   /* )                       */
+    EOF_TOKEN           /* end of input            */
+} TokenType;
 
-static int cur_tok;   /* current token type          */
-static int cur_num;   /* numeric value when TOK_NUM  */
-static int err;       /* error flag                  */
+/* ── Global scanner state ──────────────────────────────────────── */
+static TokenType cur_token;
+static int       cur_num;   /* value when LITERAL_TOKEN */
+static int       err;       /* 1 = parse error          */
 
-/* ── Scanner (reads from stdin) ────────────────────────────────── */
-static int next_token(void)
+/* ── Helper (same as HW#1) ─────────────────────────────────────── */
+int isDigit(int c)
+{
+    return c >= '0' && c <= '9';
+}
+
+/* ── Scanner: reads from stdin, same logic as HW#1 ─────────────── */
+TokenType scan(void)
 {
     int c;
+    int len;
+    char buf[256];
 
     /* skip whitespace */
-    while ((c = getchar()) == ' ' || c == '\t' || c == '\n' || c == '\r')
-        ;
+    while ((c = getchar()) != EOF) {
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
+            break;
+    }
 
-    if (c == EOF) return TOK_EOF;
+    if (c == EOF) return EOF_TOKEN;
 
-    if (c >= '0' && c <= '9') {
-        cur_num = c - '0';
-        while ((c = getchar()) != EOF && c >= '0' && c <= '9')
-            cur_num = cur_num * 10 + (c - '0');
+    if (isDigit(c)) {
+        /* read integer literal (same as HW#1 LITERAL_TOKEN) */
+        len = 0;
+        buf[len++] = (char)c;
+        while ((c = getchar()) != EOF && isDigit(c)) {
+            buf[len++] = (char)c;
+        }
+        buf[len] = '\0';
         if (c != EOF) ungetc(c, stdin);
-        return TOK_NUM;
+
+        /* convert string to int without atoi (no stdlib.h) */
+        cur_num = 0;
+        len = 0;
+        while (buf[len] != '\0') {
+            cur_num = cur_num * 10 + (buf[len] - '0');
+            len++;
+        }
+        return LITERAL_TOKEN;
     }
 
     switch (c) {
-        case '+': return TOK_PLUS;
-        case '(': return TOK_LPAREN;
-        case ')': return TOK_RPAREN;
+        case '+': return PLUS_TOKEN;
+        case '(': return LEFTPAREN_TOKEN;
+        case ')': return RIGHTPAREN_TOKEN;
         default:
             err = 1;
-            return TOK_EOF;
+            return EOF_TOKEN;
     }
 }
 
-/* ── Print 2*d spaces ───────────────────────────────────────────── */
+/* ── Print 2*d spaces for tree indentation ──────────────────────── */
 static void do_indent(int d)
 {
     int i;
@@ -74,13 +97,13 @@ static void parse_S(int d)
 {
     if (err) return;
 
-    switch (cur_tok) {
-        case TOK_NUM:
-        case TOK_LPAREN:
+    switch (cur_token) {
+        case LITERAL_TOKEN:
+        case LEFTPAREN_TOKEN:
             do_indent(d);
             printf("S -> E S'\n");
-            parse_E(d + 1);   /* E is one level deeper  */
-            parse_Sp(d);      /* S' is at the same level as S */
+            parse_E(d + 1);    /* E is one level deeper  */
+            parse_Sp(d);       /* S' stays at same level */
             break;
         default:
             err = 1;
@@ -93,15 +116,15 @@ static void parse_Sp(int d)
 {
     if (err) return;
 
-    switch (cur_tok) {
-        case TOK_PLUS:
+    switch (cur_token) {
+        case PLUS_TOKEN:
             do_indent(d);
             printf("S' -> + S\n");
-            cur_tok = next_token();   /* consume '+' */
+            cur_token = scan();   /* consume '+' */
             parse_S(d + 1);
             break;
-        case TOK_RPAREN:
-        case TOK_EOF:
+        case RIGHTPAREN_TOKEN:
+        case EOF_TOKEN:
             do_indent(d);
             printf("S' -> e\n");
             break;
@@ -116,23 +139,23 @@ static void parse_E(int d)
 {
     if (err) return;
 
-    switch (cur_tok) {
-        case TOK_NUM:
+    switch (cur_token) {
+        case LITERAL_TOKEN:
             do_indent(d);
             printf("%d\n", cur_num);
-            cur_tok = next_token();   /* consume number */
+            cur_token = scan();   /* consume number */
             break;
-        case TOK_LPAREN:
+        case LEFTPAREN_TOKEN:
             do_indent(d);
             printf("E -> ( S )\n");
-            cur_tok = next_token();   /* consume '(' */
+            cur_token = scan();   /* consume '(' */
             parse_S(d + 1);
-            if (!err && cur_tok != TOK_RPAREN) {
+            if (!err && cur_token != RIGHTPAREN_TOKEN) {
                 err = 1;
                 printf("syntax error\n");
                 break;
             }
-            cur_tok = next_token();   /* consume ')' */
+            cur_token = scan();   /* consume ')' */
             break;
         default:
             err = 1;
@@ -144,9 +167,9 @@ static void parse_E(int d)
 int main(void)
 {
     err = 0;
-    cur_tok = next_token();
+    cur_token = scan();
     parse_S(0);
-    if (!err && cur_tok != TOK_EOF)
+    if (!err && cur_token != EOF_TOKEN)
         printf("syntax error\n");
     return 0;
 }
