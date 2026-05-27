@@ -28,6 +28,7 @@ typedef enum {
 static TokenType cur_token;
 static int       cur_num;   /* value when LITERAL_TOKEN */
 static int       err;       /* 1 = parse error          */
+static FILE     *input_fp;  /* file to read from        */
 
 /* ── Helper (same as HW#1) ─────────────────────────────────────── */
 int isDigit(int c)
@@ -35,7 +36,7 @@ int isDigit(int c)
     return c >= '0' && c <= '9';
 }
 
-/* ── Scanner: reads from stdin, same logic as HW#1 ─────────────── */
+/* ── Scanner: reads from input_fp, same logic as HW#1 ───────────── */
 TokenType scan(void)
 {
     int c;
@@ -43,7 +44,7 @@ TokenType scan(void)
     char buf[256];
 
     /* skip whitespace */
-    while ((c = getchar()) != EOF) {
+    while ((c = fgetc(input_fp)) != EOF) {
         if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
             break;
     }
@@ -54,11 +55,11 @@ TokenType scan(void)
         /* read integer literal (same as HW#1 LITERAL_TOKEN) */
         len = 0;
         buf[len++] = (char)c;
-        while ((c = getchar()) != EOF && isDigit(c)) {
+        while ((c = fgetc(input_fp)) != EOF && isDigit(c)) {
             buf[len++] = (char)c;
         }
         buf[len] = '\0';
-        if (c != EOF) ungetc(c, stdin);
+        if (c != EOF) ungetc(c, input_fp);
 
         /* convert string to int without atoi (no stdlib.h) */
         cur_num = 0;
@@ -163,13 +164,26 @@ static void parse_E(int d)
     }
 }
 
-/* ── Entry point ────────────────────────────────────────────────── */
-int main(void)
+/* ── Entry point (same argument style as HW#1) ──────────────────── */
+int main(int argc, char *argv[])
 {
+    if (argc >= 2) {
+        input_fp = fopen(argv[1], "r");
+        if (input_fp == NULL) {
+            printf("Cannot open file\n");
+            return 1;
+        }
+    } else {
+        input_fp = stdin;
+    }
+
     err = 0;
     cur_token = scan();
     parse_S(0);
     if (!err && cur_token != EOF_TOKEN)
         printf("syntax error\n");
+
+    if (input_fp != stdin)
+        fclose(input_fp);
     return 0;
 }

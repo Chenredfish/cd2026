@@ -6,19 +6,32 @@ gcc -o main main.c
 ```
 
 ## Run
+
+**With an input file (recommended, same as HW1):**
 ```
-./main
+.\main.exe input.txt
 ```
-Input is read from stdin. Type the expression and press Enter.
+
+**With stdin (Linux/bash only):**
+```bash
+echo "(1+2+(3+4))+5" | ./main
+```
+
+> Note: Do **not** pass the expression as a command-line argument.
+> PowerShell evaluates `(...)` as arithmetic before passing to the program.
 
 ## Example
+
+`input.txt`:
 ```
-./main
 (1+2+(3+4))+5
 ```
 
-## Output Format
-Each grammar rule applied is printed with 2-space indentation per depth level.
+```
+.\main.exe input.txt
+```
+
+Output:
 ```
 S -> E S'
   E -> ( S )
@@ -27,11 +40,20 @@ S -> E S'
     S' -> + S
       S -> E S'
         2
-      ...
-  S' -> + S
-    S -> E S'
-      5
-    S' -> e
+      S' -> + S
+        S -> E S'
+          E -> ( S )
+            S -> E S'
+              3
+            S' -> + S
+              S -> E S'
+                4
+              S' -> e
+          S' -> e
+S' -> + S
+  S -> E S'
+    5
+  S' -> e
 ```
 
 ## Grammar
